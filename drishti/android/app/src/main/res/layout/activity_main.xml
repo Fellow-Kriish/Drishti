@@ -46,6 +46,35 @@
             android:textColor="@color/white"
             android:textSize="14sp" />
 
+        <!-- Mode toggle button -->
+        <TextView
+            android:id="@+id/btn_mode_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="INDOOR"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="#4400AAFF"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:layout_marginEnd="8dp"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <!-- Flashlight toggle button -->
+        <ImageButton
+            android:id="@+id/btn_flashlight"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_camera"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Toggle Flashlight"
+            android:tint="@color/white"
+            android:layout_marginEnd="8dp" />
+
         <!-- Settings gear -->
         <ImageButton
             android:id="@+id/btn_settings"

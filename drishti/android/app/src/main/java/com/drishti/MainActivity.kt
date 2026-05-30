@@ -20,6 +20,7 @@ import com.drishti.logging.SessionLogger
 import com.drishti.model.AlertPayload
 import com.drishti.network.FrameGate
 import com.drishti.network.WebSocketClient
+import org.json.JSONObject
 
 /**
  * Main activity — orchestrates the entire Drishti pipeline:
@@ -44,6 +45,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var alertText: TextView
     private lateinit var btnSettings: ImageButton
+    private lateinit var btnModeToggle: TextView
+    private lateinit var btnFlashlight: ImageButton
 
     // ── Components ───────────────────────────────────────────────────────
     private lateinit var ttsEngine: TtsEngine
@@ -54,6 +57,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraManager: CameraManager
 
     private var isTtsReady = false
+    private var indoorMode = true  // default to indoor
 
     // ════════════════════════════════════════════════════════════════════
     // Lifecycle
@@ -72,9 +76,23 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.status_text)
         alertText = findViewById(R.id.alert_text)
         btnSettings = findViewById(R.id.btn_settings)
+        btnModeToggle = findViewById(R.id.btn_mode_toggle)
+        btnFlashlight = findViewById(R.id.btn_flashlight)
 
         btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        btnModeToggle.setOnClickListener {
+            onModeToggle()
+        }
+
+        btnFlashlight.setOnClickListener {
+            val isOn = cameraManager.toggleFlashlight()
+            // Optionally change the icon or tint if desired
+            if (isTtsReady) {
+                ttsEngine.speak(if (isOn) "Flashlight on" else "Flashlight off", flush = true)
+            }
         }
 
         // Init components
@@ -175,6 +193,9 @@ class MainActivity : AppCompatActivity() {
         }
         frameGate.reset()
 
+        // Send current mode to server on connect
+        sendModeToServer()
+
         // Announce reconnection if TTS is ready
         if (isTtsReady) {
             alertQueue.enqueue(AlertPayload("P1", "Connected to server", 0.0f))
@@ -262,6 +283,39 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse server message: ${e.message}")
         }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Mode toggle
+    // ════════════════════════════════════════════════════════════════════
+
+    private fun onModeToggle() {
+        indoorMode = !indoorMode
+        sendModeToServer()
+
+        val modeLabel = if (indoorMode) "INDOOR" else "OUTDOOR"
+        val bgColor = if (indoorMode) 0x4400AAFF.toInt() else 0x4400AA00.toInt()
+
+        runOnUiThread {
+            btnModeToggle.text = modeLabel
+            btnModeToggle.setBackgroundColor(bgColor)
+        }
+
+        if (isTtsReady) {
+            ttsEngine.speak(
+                if (indoorMode) "Indoor mode" else "Outdoor mode",
+                flush = true
+            )
+        }
+
+        Log.i(TAG, "Mode toggled to: $modeLabel")
+    }
+
+    private fun sendModeToServer() {
+        val msg = JSONObject()
+        msg.put("type", "mode")
+        msg.put("mode", if (indoorMode) "indoor" else "outdoor")
+        webSocketClient.sendText(msg.toString())
     }
 
     // ════════════════════════════════════════════════════════════════════

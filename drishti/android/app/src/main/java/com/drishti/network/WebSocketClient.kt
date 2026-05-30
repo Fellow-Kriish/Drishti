@@ -73,6 +73,16 @@ class WebSocketClient(
         return webSocket?.send(ByteString.of(*data)) ?: false
     }
 
+    /**
+     * Send a text message (JSON) to the server.
+     * Used for mode toggle and other control messages.
+     * @return true if sent successfully, false if not connected.
+     */
+    fun sendText(text: String): Boolean {
+        if (!isConnected) return false
+        return webSocket?.send(text) ?: false
+    }
+
     // ── Internal ────────────────────────────────────────────────────────────
 
     private fun doConnect(url: String) {

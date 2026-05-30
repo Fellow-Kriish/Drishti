@@ -42,6 +42,23 @@ CLASS_TO_BASE_TIER: dict[str, str] = {
 }
 
 
+# ── Cross-validation eligibility ─────────────────────────────────────────────
+# True = consistent real-world size → cross-validation valid
+# False = size varies too much → skip cross-validation
+CV_ELIGIBLE: dict[str, bool] = {
+    "person":     True,
+    "bicycle":    True,
+    "motorcycle": True,
+    "dog":        True,
+    "cow":        True,
+    "car":        True,
+    "truck":      False,   # huge size variance
+    "bus":        False,
+    "chair":      False,
+    "bench":      False,
+}
+
+
 def get_base_tier(class_name: str) -> str | None:
     """Return the base tier for a YOLO class, or None if unmapped."""
     return CLASS_TO_BASE_TIER.get(class_name)

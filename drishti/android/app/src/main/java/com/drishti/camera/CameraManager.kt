@@ -32,11 +32,13 @@ class CameraManager(
         private const val TAG = "DrishtiCamera"
         private const val TARGET_WIDTH = 640
         private const val TARGET_HEIGHT = 480
-        private const val JPEG_QUALITY = 75
+        private const val JPEG_QUALITY = 60
     }
 
     private var cameraProvider: ProcessCameraProvider? = null
+    private var camera: Camera? = null
     private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private var isFlashlightOn = false
 
     /**
      * Bind camera to lifecycle and start frame capture.
@@ -61,6 +63,15 @@ class CameraManager(
      */
     fun shutdown() {
         analysisExecutor.shutdown()
+    }
+
+    /**
+     * Toggle the flashlight. Returns the new state.
+     */
+    fun toggleFlashlight(): Boolean {
+        isFlashlightOn = !isFlashlightOn
+        camera?.cameraControl?.enableTorch(isFlashlightOn)
+        return isFlashlightOn
     }
 
     // ── Internal ────────────────────────────────────────────────────────────
@@ -90,7 +101,7 @@ class CameraManager(
 
         try {
             provider.unbindAll()
-            provider.bindToLifecycle(
+            camera = provider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
                 preview,
