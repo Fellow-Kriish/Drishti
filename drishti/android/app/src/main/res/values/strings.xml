@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Drishti</string>
+    <string name="settings_title">Settings</string>
+    <string name="server_ip_label">Server IP Address</string>
+    <string name="server_port_label">Server Port</string>
+    <string name="save_button">Save</string>
+    <string name="connection_status_connected">Connected</string>
+    <string name="connection_status_disconnected">Disconnected</string>
+    <string name="camera_permission_required">Camera permission is required for Drishti to work</string>
+</resources>

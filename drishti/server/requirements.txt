@@ -1,0 +1,16 @@
+# Drishti Server — Dependencies
+# Install PyTorch with CUDA separately first:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# Then install the rest:
+#   pip install -r requirements.txt
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+websockets>=13.0
+
+ultralytics>=8.3.0
+
+transformers>=4.45.0
+Pillow>=10.0.0
+numpy>=1.26.0
+opencv-python>=4.9.0

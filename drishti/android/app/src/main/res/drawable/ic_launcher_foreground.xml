@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Eye symbol for Drishti (दृष्टि = vision) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,38 C40,38 28,48 24,54 C28,60 40,70 54,70 C68,70 80,60 84,54 C80,48 68,38 54,38 Z" />
+    <path
+        android:fillColor="#1B5E20"
+        android:pathData="M54,46 A8,8 0 1,0 54,62 A8,8 0 1,0 54,46 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M54,50 A4,4 0 1,0 54,58 A4,4 0 1,0 54,50 Z" />
+</vector>

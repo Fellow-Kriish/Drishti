@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext (non-HTTPS) traffic to the laptop hotspot IPs -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Windows hotspot IP -->
+        <domain includeSubdomains="false">192.168.137.1</domain>
+        <!-- Linux hotspot IP -->
+        <domain includeSubdomains="false">10.42.0.1</domain>
+        <!-- Localhost for testing -->
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>
