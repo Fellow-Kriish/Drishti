@@ -9,18 +9,19 @@ PORT = 8000
 
 # ── Model paths / IDs ────────────────────────────────────────────────────────
 YOLO_MODEL_PATH = "yolov8n.pt"  # auto-downloads on first run
-DEPTH_MODEL_ID = "depth-anything/Depth-Anything-V2-Small-hf"
+# Depth model checkpoints are in checkpoints/ — loaded by models.py
 
 # ── Input resolutions ────────────────────────────────────────────────────────
 YOLO_INPUT_SIZE = (640, 640)
-DEPTH_INPUT_SIZE = (518, 518)
+# Depth model handles its own 518×518 resize internally — no config needed
 
-# ── Depth thresholds (calibrate empirically) ─────────────────────────────────
-# depth_score: 0.0 = closest, 1.0 = farthest
-DEPTH_VERY_CLOSE = 0.15   # override to P0 regardless of class
-DEPTH_CLOSE = 0.30        # escalate one tier
-DEPTH_MEDIUM = 0.55       # use base tier as-is
-# > 0.55 → suppress alert (too far)
+# ── Depth thresholds (METRIC — absolute meters) ─────────────────────────────
+# Used by resolve_tier_metric() for YOLO detections
+METRIC_P0_M = 1.0    # < 1.0m  → STOP
+METRIC_P1_M = 2.0    # < 2.0m  → Slow down
+METRIC_P2_M = 4.0    # < 4.0m  → Warning
+METRIC_P3_M = 6.0    # < 6.0m  → Guidance
+# > 6.0m → suppress alert
 
 # ── YOLO confidence threshold ────────────────────────────────────────────────
 YOLO_CONFIDENCE = 0.40
@@ -35,14 +36,11 @@ DEBUG_MODE = False        # if True, sends debug grid overlay in JSON response
 # ── Indoor pipeline ──────────────────────────────────────────────────────────
 CEIL_MASK_FRAC    = 0.25    # top 25% of frame = ceiling, excluded from analysis
 GROUND_ROI_FRAC   = 0.25    # bottom 25% of frame = ground plane scan
-EMA_ALPHA         = 0.50    # higher than outdoor — compensates for lower FPS
-ROLLING_WINDOW_N  = 8       # frames (~1.45s at 5.5 FPS average)
 ALERT_SUPPRESS_S  = 1.5     # indoor suppression window (seconds)
 YOLO_CONF_INDOOR  = 0.30    # lowered from 0.40 for indoor
 YOLO_TEMPORAL_MIN = 2       # detection must appear in N consecutive frames
 
-# ── Indoor grid thresholds (calibrate from corridor walk) ────────────────────
-P0_THRESH = 0.15   # Stop — object extremely close (< arm's reach)
-P1_THRESH = 0.35   # Slow — object approaching (1-2m)
-P2_THRESH = 0.60   # Caution — object at medium distance
-
+# ── Indoor grid thresholds (METRIC — meters) ─────────────────────────────────
+P0_THRESH_M = 1.0   # Stop — within arm's reach
+P1_THRESH_M = 2.5   # Slow — 1-2.5m
+P2_THRESH_M = 4.0   # Caution — medium distance

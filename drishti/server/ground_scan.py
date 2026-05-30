@@ -1,22 +1,23 @@
 """
-Ground-plane discontinuity scan.
+Ground-plane discontinuity scan (outdoor).
 
 Detects kerbs, drains, potholes, broken steps — hazards that produce no
 YOLO bounding box but appear as abrupt depth transitions on the ground plane.
-Pure NumPy on the depth map already computed. No extra model required.
+
+All depth values are in METERS (metric depth).
 """
 
 import numpy as np
 
-# Tuning parameters — calibrate empirically
+# Tuning parameters
 GROUND_START_FRACTION = 0.55   # scan bottom 45% of frame
-GRADIENT_THRESHOLD    = 0.18   # depth change per pixel → hazard edge
+GRADIENT_THRESHOLD    = 0.18   # depth change per pixel → hazard edge (unitless)
 CLUSTER_MIN_PIXELS    = 12     # minimum edge pixels to count as a real hazard
-HAZARD_DEPTH_MAX      = 0.40   # only alert for hazards in close range (inverted: high normalized = close)
+HAZARD_DEPTH_MAX_M    = 3.0    # only alert for hazards within 3 meters
 
 
 def scan_ground_plane(
-    depth_norm: np.ndarray,
+    depth_meters: np.ndarray,
     detections: list,
     vanishing_point_x: int | None = None,
 ) -> dict | None:
@@ -24,9 +25,9 @@ def scan_ground_plane(
     Returns alert dict or None.
     alert: {"tier": str, "message": str, "pan_channel": float, "source": str}
     """
-    h, w = depth_norm.shape[:2]
+    h, w = depth_meters.shape[:2]
     ground_start = int(h * GROUND_START_FRACTION)
-    ground = depth_norm[ground_start:, :]
+    ground = depth_meters[ground_start:, :]
 
     # Mask out bounding box regions (object surfaces, not ground)
     mask = np.ones_like(ground, dtype=bool)
@@ -46,33 +47,28 @@ def scan_ground_plane(
     if not np.any(edge_pixels):
         return None
 
-    # Only care about close-range hazards
-    # In disparity space (after normalization), high values = close
-    close_edges = edge_pixels & (ground > (1.0 - HAZARD_DEPTH_MAX))
+    # Only care about close-range hazards (meters: lower = closer)
+    close_edges = edge_pixels & (ground < HAZARD_DEPTH_MAX_M)
 
     if np.sum(close_edges) < CLUSTER_MIN_PIXELS:
         return None
 
     # Find which zone the hazard is in
-    edge_xs = np.where(close_edges)[1]   # x coordinates of edge pixels
+    edge_xs = np.where(close_edges)[1]
     hazard_x = int(np.median(edge_xs))
 
     zone, pan = _zone_from_x(hazard_x, w, vanishing_point_x)
 
-    # Tier based on how close (depth value of the hazard pixels)
-    # Higher normalized value = closer in disparity space
-    hazard_depth_raw = float(np.median(ground[close_edges]))
-    # Convert to "score" space: 0 = closest, 1 = farthest
-    hazard_score = 1.0 - hazard_depth_raw
-
-    tier = "P0" if hazard_score < 0.15 else "P1" if hazard_score < 0.30 else "P2"
+    # Tier based on depth in meters
+    hazard_depth_m = float(np.median(ground[close_edges]))
+    tier = "P0" if hazard_depth_m < 0.8 else "P1" if hazard_depth_m < 1.5 else "P2"
 
     return {
         "tier":        tier,
         "message":     f"Surface hazard, {zone}",
         "pan_channel": pan,
-        "source":      "ground_scan",   # distinguish from object alerts in CSV log
-        "depth_score": hazard_score,
+        "source":      "ground_scan",
+        "depth_m":     hazard_depth_m,
     }
 
 

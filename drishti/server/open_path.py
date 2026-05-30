@@ -1,38 +1,36 @@
 """
 Depth-map column sampling for open-path direction.
 
-Samples the depth map ground plane directly instead of summing bounding box
-area per column. A person at 20m in center column no longer marks it "blocked".
+Samples the depth map ground plane directly. Uses METERS.
 """
 
 import numpy as np
 
-CLOSE_THRESHOLD   = 0.35   # depth score below this = occupied ground
+CLOSE_THRESHOLD_M = 2.0    # ground pixels closer than 2m = occupied
 GROUND_ROWS_START = 0.55   # bottom 45% of frame = ground plane region
 BBOX_MARGIN_PX    = 4      # shrink bbox slightly before masking
 
 
 def open_path_direction(
-    depth_norm: np.ndarray,
+    depth_meters: np.ndarray,
     detections: list,
     col_boundaries: list[int] | None = None,
-    close_threshold: float = CLOSE_THRESHOLD,
+    close_threshold_m: float = CLOSE_THRESHOLD_M,
 ) -> str:
     """
     Returns "Open path: left" / "ahead" / "right".
-    Uses depth map ground-plane occupancy, not bounding box area.
+    Uses depth map ground-plane occupancy in meters.
     """
-    h, w = depth_norm.shape[:2]
+    h, w = depth_meters.shape[:2]
 
     # Ground plane region: bottom 45% of frame
     ground_start = int(h * GROUND_ROWS_START)
-    ground = depth_norm[ground_start:, :]   # shape: (rows, w)
+    ground = depth_meters[ground_start:, :]
 
-    # Mask out pixels inside YOLO bounding boxes (object surfaces, not ground)
-    mask = np.ones_like(ground, dtype=bool)  # True = valid ground pixel
+    # Mask out pixels inside YOLO bounding boxes
+    mask = np.ones_like(ground, dtype=bool)
     for det in detections:
         x1, y1, x2, y2 = det["bbox_depth"]
-        # Remap y to ground-plane slice coordinates
         y1g = max(0, y1 - ground_start - BBOX_MARGIN_PX)
         y2g = max(0, y2 - ground_start + BBOX_MARGIN_PX)
         x1c = max(0, x1 - BBOX_MARGIN_PX)
@@ -54,11 +52,8 @@ def open_path_direction(
             loads.append(0.0)
             continue
 
-        # For disparity-based depth (higher = closer after normalization):
-        # "close" pixels are those with HIGH normalized values
-        # But after our DepthNormalizer, we still have disparity space
-        # So high values = close. We count pixels ABOVE threshold as occupied.
-        occupied = np.sum(valid_pixels > (1.0 - close_threshold))
+        # In meters: pixels BELOW threshold = occupied (close)
+        occupied = np.sum(valid_pixels < close_threshold_m)
         loads.append(occupied / valid_pixels.size)
 
     min_load = min(loads)

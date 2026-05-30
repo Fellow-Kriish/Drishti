@@ -25,3 +25,8 @@ output_*.jpg
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Depth Anything V2 (cloned repo + checkpoints)
+Depth-Anything-V2/
+checkpoints/
+build_err.txt
