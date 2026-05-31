@@ -47,11 +47,14 @@ def select_highest_priority(
     """
     Select the single highest-priority alert from a list.
 
-    Each alert dict must have keys: tier, label, depth_score, zone
+    Each alert dict must have keys: tier, zone, and optionally depth_m.
+    Alerts without a depth key (e.g. ground_scan, indoor alerts) are
+    treated as distance 999 so they never beat a closer YOLO detection
+    at the same tier.
 
     Priority:
         1. Highest tier (P0 > P1 > P2 > ...)
-        2. Among same tier, closest depth score (lowest value)
+        2. Among same tier, closest depth (lowest depth_m / depth_score value)
 
     Returns:
         The winning alert dict, or None if the list is empty.
@@ -61,5 +64,8 @@ def select_highest_priority(
 
     return min(
         alerts,
-        key=lambda a: (TIER_ORDER.index(a["tier"]), a["depth_score"]),
+        key=lambda a: (
+            TIER_ORDER.index(a["tier"]),
+            a.get("depth_m", a.get("depth_score", 999)),
+        ),
     )

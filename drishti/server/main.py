@@ -36,7 +36,7 @@ from config import (
     PATH_CLEAR_TIMEOUT_SEC,
 )
 from models import load_models, run_yolo, run_depth, get_device, swap_depth_model
-from depth_processing import resolve_tier_metric, get_depth_meters
+from depth_processing import resolve_tier_metric, get_depth_meters, find_generic_obstacles
 from zone_detection import get_zone, get_pan_channel
 from alert_builder import build_message, select_highest_priority
 from class_tiers import TIER_ORDER
@@ -354,6 +354,12 @@ def _process_outdoor(
     ground_alert = scan_ground_plane(depth_map, processed_detections, vanishing_point_x=vp_x)
     if ground_alert:
         alerts.append(ground_alert)
+
+    # Generic obstacle fallback — catches close surfaces YOLO missed
+    # (empty street, misty scene, unusual object not in COCO classes)
+    if not alerts:
+        generic_obstacles = find_generic_obstacles(depth_map)
+        alerts.extend(generic_obstacles)
 
     # Open-path direction
     path_msg = open_path_direction(depth_map, processed_detections, col_boundaries=col_bounds)

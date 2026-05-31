@@ -30,7 +30,7 @@ YOLO_CONFIDENCE = 0.40
 PATH_CLEAR_TIMEOUT_SEC = 5.0  # seconds of no P0/P1 before sending "Path is clear"
 
 # ── Debug / Calibration ──────────────────────────────────────────────────────
-CALIBRATION_MODE = True  # if True, prints depth_score/class/bbox per frame
+CALIBRATION_MODE = False  # set True to print depth/class/bbox per detection (dev only)
 DEBUG_MODE = False        # if True, sends debug grid overlay in JSON response
 
 # ── Indoor pipeline ──────────────────────────────────────────────────────────
