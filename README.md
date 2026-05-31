@@ -52,6 +52,10 @@ python main.py
 2. Set the server IP in `MainActivity.kt` (search for `WS_URL`).
 3. Build and run on a device running Android 8+ (API 26+).
 
+> **Model checkpoints:** Download `depth_anything_v2_metric_hypersim_vits.pth`
+> and `depth_anything_v2_metric_vkitti_vits.pth` from HuggingFace and place
+> them in `drishti/server/checkpoints/`.
+
 > **Sherpa-ONNX TTS** is optional. If you want on-device TTS instead of Android's built-in `TextToSpeech`, see `drishti/android/app/src/main/assets/README.md` for asset setup instructions.
 
 ---
@@ -124,3 +128,5 @@ drishti/
 - The Android build requires **JDK 17** (not JDK 26). Use the JDK bundled with Android Studio via `File → Project Structure → SDK Location → Gradle JDK`.
 - Sherpa-ONNX AAR and TTS model assets are **not committed** to the repo (large binary files). Follow `assets/README.md` to download them.
 - The server auto-downloads `yolov8n.pt` on first run if not present.
+- Connect the Android device to the **laptop's personal hotspot** (not venue Wi-Fi).
+  The server IP on a Windows hotspot is always `192.168.137.1`.
