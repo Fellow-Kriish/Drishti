@@ -12,7 +12,7 @@ from indoor_grid import grid_cell_tier
 
 # ── Corridor detection (meters) ──────────────────────────────────────────────
 
-NARROW_CORRIDOR_THRESH_M = 2.5   # wall within 2.5m = corridor wall
+NARROW_CORRIDOR_THRESH_M = 1.2   # wall within 1.2m = corridor wall
 NARROW_CORRIDOR_FRAMES   = 8     # must persist 8 frames (~1.5s) to confirm
 
 DOORWAY_FAR_THRESH_M = 5.0    # opening reads as > 5m = doorway gap

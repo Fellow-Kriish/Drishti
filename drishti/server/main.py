@@ -34,9 +34,11 @@ from config import (
     YOLO_INPUT_SIZE,
     CALIBRATION_MODE,
     PATH_CLEAR_TIMEOUT_SEC,
+    LOOMING_HISTORY_N,
+    P3_SUPPRESS_S,
 )
 from models import load_models, run_yolo, run_depth, get_device, swap_depth_model
-from depth_processing import resolve_tier_metric, get_depth_meters, find_generic_obstacles
+from depth_processing import resolve_tier_metric, get_depth_meters, find_generic_obstacles, LoomingDetector, resolve_p0_p1
 from zone_detection import get_zone, get_pan_channel
 from alert_builder import build_message, select_highest_priority
 from class_tiers import TIER_ORDER
@@ -106,6 +108,11 @@ async def websocket_endpoint(ws: WebSocket):
     path_clear_sent = False
     frame_count = 0
 
+    # Indoor alert state
+    looming_detector   = LoomingDetector(window=LOOMING_HISTORY_N)
+    last_p3_alert_time = 0.0
+    last_p3_alert_text = ""
+
     # Outdoor
     vp_estimator = VanishingPointEstimator(frame_width=518)
 
@@ -164,10 +171,13 @@ async def websocket_endpoint(ws: WebSocket):
 
             # ── Route to indoor or outdoor pipeline ──────────────────────────
             if current_mode == "indoor":
-                payload = _process_indoor(
+                payload, last_p3_alert_time, last_p3_alert_text = _process_indoor(
                     depth_map, detections_raw,
                     indoor_depth, indoor_zones, indoor_ground,
                     yolo_filter, alert_composer,
+                    looming_detector,
+                    last_p3_alert_time,
+                    last_p3_alert_text,
                     frame_count,
                 )
             else:
@@ -222,33 +232,53 @@ def _process_indoor(
     indoor_ground: IndoorGroundScanner,
     yolo_filter: YoloTemporalFilter,
     alert_composer: IndoorAlertComposer,
+    looming_detector: LoomingDetector,
+    last_p3_alert_time: float,
+    last_p3_alert_text: str,
     frame_count: int,
-) -> dict:
-    """Full indoor pipeline — metric depth, no warmup needed."""
+) -> tuple[dict, float, str]:
+    """Full indoor pipeline — metric depth, looming detection, P3 gating."""
 
     # 1. Ceiling mask (still useful — ceilings produce noisy depth)
     masked_depth = indoor_depth.process(depth_map)
 
-    # 2. 3×2 occupancy grid (values in meters now)
+    # 2. Looming detection — per zone, using masked depth
+    import time as _t
+    _now = _t.perf_counter()
+    FRAME_W = depth_map.shape[1]
+    _zone_map = {
+        "LEFT":   masked_depth[:, :FRAME_W // 3],
+        "CENTER": masked_depth[:, FRAME_W // 3 : 2 * FRAME_W // 3],
+        "RIGHT":  masked_depth[:, 2 * FRAME_W // 3 :],
+    }
+    looming_results = {}
+    for _zone_key, _region in _zone_map.items():
+        _valid = _region[~np.isnan(_region)]
+        if _valid.size == 0:
+            continue
+        _raw_depth = float(np.percentile(_valid, 10))   # closest surface in zone
+        looming_results[_zone_key] = looming_detector.update(_zone_key, _raw_depth, _now)
+
+    # 3. 3×2 occupancy grid (values in meters now)
     grid = build_occupancy_grid(masked_depth)
 
-    # 3. Corridor zone logic
+    # 4. Corridor zone logic
     corridor_info = indoor_zones.analyse_corridor(grid)
     corridor_info["narrowing"] = indoor_zones.update_center_trend(grid[0, 1])
 
-    # 4. Ground-plane scan (steps / stairs)
+    # 5. Ground-plane scan (steps / stairs)
     ground_hazard = indoor_ground.scan(masked_depth, detections_raw)
 
-    # 5. Doorway detection
+    # 6. Doorway detection
     doorway = detect_doorway(masked_depth, corridor_info)
 
-    # 6. Mirror / reflective surface check
+    # 7. Mirror / reflective surface check
     mirror_anomaly = check_mirror_anomaly(detections_raw, grid, corridor_info)
 
-    # 7. YOLO temporal filter
+    # 8. YOLO temporal filter
     yolo_confirmed = yolo_filter.filter(detections_raw)
 
-    # 8. Alert composition
+    # 9. Alert composition
     alert = alert_composer.compose(
         corridor_info=corridor_info,
         ground_hazard=ground_hazard,
@@ -257,6 +287,9 @@ def _process_indoor(
         grid=grid,
         mirror_anomaly=mirror_anomaly,
         window_ready=True,  # always ready with metric depth
+        looming_results=looming_results,
+        last_p3_alert_time=last_p3_alert_time,
+        last_p3_alert_text=last_p3_alert_text,
     )
 
     if CALIBRATION_MODE:
@@ -270,14 +303,23 @@ def _process_indoor(
             f"yolo={len(yolo_confirmed)}"
         )
 
+    new_p3_time = last_p3_alert_time
+    new_p3_text = last_p3_alert_text
+
     if alert.get("alert"):
-        return {
+        result = {
             "tier": alert["tier"],
             "message": alert["message"],
             "pan_channel": alert["pan_channel"],
         }
+        # Update P3 state if this was a P3 alert
+        if alert["tier"] == "P3":
+            new_p3_time = _t.perf_counter()
+            new_p3_text = alert["message"]
     else:
-        return {"tier": None, "message": None, "pan_channel": 0.0}
+        result = {"tier": None, "message": None, "pan_channel": 0.0}
+
+    return result, new_p3_time, new_p3_text
 
 
 # ── Outdoor pipeline ────────────────────────────────────────────────────────

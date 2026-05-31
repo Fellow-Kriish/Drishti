@@ -6,9 +6,15 @@ No normalization needed — thresholds are physical distances.
 """
 
 import numpy as np
+from collections import deque
+import time as _time
 
 from class_tiers import CLASS_TO_BASE_TIER, TIER_ORDER
-from config import METRIC_P0_M, METRIC_P1_M, METRIC_P2_M, METRIC_P3_M
+from config import (
+    METRIC_P0_M, METRIC_P1_M, METRIC_P2_M, METRIC_P3_M,
+    P0_THRESH_M, P1_THRESH_M,
+    LOOMING_DEPTH_M, LOOMING_RATE_MS, LOOMING_HISTORY_N,
+)
 
 
 def get_depth_meters(depth_map: np.ndarray, bbox: tuple[int, int, int, int]) -> float:
@@ -110,3 +116,95 @@ def find_generic_obstacles(depth_map: np.ndarray) -> list[dict]:
             })
 
     return obstacles
+
+
+class LoomingDetector:
+    """
+    Per-zone depth history tracker.
+    Computes rolling median and rate-of-approach for looming detection.
+
+    One instance per WebSocket session. Zone keys: "LEFT", "CENTER", "RIGHT".
+    Uses deque(maxlen=LOOMING_HISTORY_N) — O(1) update, automatic eviction.
+    """
+
+    def __init__(self, window: int = LOOMING_HISTORY_N):
+        self._window = window
+        self._history: dict[str, deque] = {}
+
+    def update(self, zone_key: str, depth_m: float, t: float | None = None) -> dict:
+        """
+        Update depth history for a zone and return computed signals.
+
+        Args:
+            zone_key:  "LEFT", "CENTER", or "RIGHT"
+            depth_m:   Raw depth in metres for this zone this frame
+            t:         Timestamp in seconds (defaults to time.perf_counter())
+
+        Returns:
+            {
+                "median_depth":     float  — rolling median over last N frames
+                "rate_of_approach": float  — m/s (positive = approaching)
+                "looming":          bool   — True if looming override should fire
+            }
+        """
+        if t is None:
+            t = _time.perf_counter()
+
+        if zone_key not in self._history:
+            self._history[zone_key] = deque(maxlen=self._window)
+
+        self._history[zone_key].append((t, depth_m))
+        readings = self._history[zone_key]
+
+        # Rolling median
+        depths = [r[1] for r in readings]
+        median_depth = float(np.median(depths))
+
+        # Rate of approach (positive = getting closer)
+        rate = 0.0
+        if len(readings) >= 2:
+            dt = readings[-1][0] - readings[0][0]
+            dd = readings[0][1] - readings[-1][1]   # old_depth - new_depth
+            rate = dd / dt if dt > 1e-6 else 0.0
+
+        # Looming flag — raw depth AND rate threshold both must be met
+        looming = (depth_m < LOOMING_DEPTH_M) and (rate > LOOMING_RATE_MS)
+
+        return {
+            "median_depth": median_depth,
+            "rate_of_approach": rate,
+            "looming": looming,
+        }
+
+
+def resolve_p0_p1(
+    median_depth: float,
+    raw_depth: float,
+    rate_of_approach: float,
+    zone: str,
+) -> str | None:
+    """
+    Determine P0 or P1 tier for a detection.
+
+    Rule 1 — Looming Override (ONLY case where raw depth bypasses median):
+        If raw_depth < LOOMING_DEPTH_M AND rate > LOOMING_RATE_MS:
+            CENTER → P0
+            LEFT/RIGHT → P1
+
+    Rule 2 — Standard path (median only, never raw):
+        median < P0_THRESH_M (0.65m) → P0
+        median < P1_THRESH_M (1.0m)  → P1
+
+    Returns tier string or None if below P0/P1 range.
+    """
+    # Rule 1: Looming override — early return, median not consulted
+    if raw_depth < LOOMING_DEPTH_M and rate_of_approach > LOOMING_RATE_MS:
+        return "P0" if zone == "CENTER" else "P1"
+
+    # Rule 2: Standard path — median only
+    if median_depth < P0_THRESH_M:
+        return "P0"
+    if median_depth < P1_THRESH_M:
+        return "P1"
+
+    return None   # caller handles P2/P3

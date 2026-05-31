@@ -40,7 +40,16 @@ ALERT_SUPPRESS_S  = 1.5     # indoor suppression window (seconds)
 YOLO_CONF_INDOOR  = 0.30    # lowered from 0.40 for indoor
 YOLO_TEMPORAL_MIN = 2       # detection must appear in N consecutive frames
 
-# ── Indoor grid thresholds (METRIC — meters) ─────────────────────────────────
-P0_THRESH_M = 1.0   # Stop — within arm's reach
-P1_THRESH_M = 2.5   # Slow — 1-2.5m
-P2_THRESH_M = 4.0   # Caution — medium distance
+# ── Indoor alert thresholds (METRIC — absolute metres) ────────────────────────
+P0_THRESH_M = 0.65   # adjusted for ±0.2m sensor error margin
+P1_THRESH_M = 1.0
+P2_THRESH_M = 2.0
+P3_THRESH_M = 3.5
+
+# ── Looming detector ──────────────────────────────────────────────────────────
+LOOMING_DEPTH_M    = 0.6    # raw depth trigger for looming override
+LOOMING_RATE_MS    = 0.5    # m/s approach rate required for looming override
+LOOMING_HISTORY_N  = 3      # frames for rolling median (deque maxlen)
+
+# ── P3 suppression ────────────────────────────────────────────────────────────
+P3_SUPPRESS_S = 10.0   # same P3 message suppressed for 10 seconds

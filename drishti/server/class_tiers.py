@@ -62,3 +62,33 @@ CV_ELIGIBLE: dict[str, bool] = {
 def get_base_tier(class_name: str) -> str | None:
     """Return the base tier for a YOLO class, or None if unmapped."""
     return CLASS_TO_BASE_TIER.get(class_name)
+
+
+# ── Dynamic obstacle classification ──────────────────────────────────────────
+# Objects in this set are NEVER suppressed in corridor mode.
+# Objects not in this set (and not detected by YOLO) = Static Structure → suppressible.
+DYNAMIC_CLASSES: set[str] = {
+    # Moving hazards
+    "person",
+    "dog",
+    "cow",
+    "bicycle",
+    "motorcycle",
+    "car",
+    "truck",
+    "bus",
+    # Furniture — static physically, but critical trip hazards in corridors.
+    # A chair in a narrow corridor must always alert.
+    "chair",
+    "dining table",
+    "bench",
+    "potted plant",
+}
+
+
+def is_dynamic(class_name: str) -> bool:
+    """
+    Returns True if the object class should never be suppressed in corridor mode.
+    Returns False for pure depth-map detections (walls, floor textures, ceiling artifacts).
+    """
+    return class_name in DYNAMIC_CLASSES
